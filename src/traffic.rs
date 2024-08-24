@@ -1,4 +1,5 @@
 use std::{
+    ops::Range,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc, RwLock,
@@ -10,7 +11,7 @@ use std::{
 use fixed_vec_deque::FixedVecDeque;
 use rand::Rng;
 
-use crate::policy::{Policy, Threshold};
+use crate::policy::{Policy, Probability, RandomEarlyDetection, Threshold};
 
 pub type Queue = FixedVecDeque<[i32; 1024]>;
 
@@ -33,6 +34,15 @@ impl Traffic {
         Threshold::new(self.queue(), threshold)
     }
 
+    pub fn define_red_policy(
+        &self,
+        range: Range<usize>,
+        weight: f32,
+        max_drop_prob: Probability,
+    ) -> RandomEarlyDetection {
+        RandomEarlyDetection::new(self.queue.clone(), range, weight, max_drop_prob)
+    }
+
     fn random_traffic(tx: Sender<i32>) {
         let mut rng = rand::thread_rng();
 
@@ -47,9 +57,13 @@ impl Traffic {
         }
     }
 
-    fn traffic_manager(rx: Receiver<i32>, queue: Arc<RwLock<Queue>>, policy: impl Policy) {
+    fn traffic_manager(
+        rx: Receiver<i32>,
+        queue: Arc<RwLock<Queue>>,
+        policy: Arc<RwLock<impl Policy>>,
+    ) {
         for received in rx {
-            if policy.allow() {
+            if policy.write().unwrap().allow() {
                 println!("Allowed: {received}");
                 *queue.write().unwrap().push_back() = received;
             } else {
@@ -59,7 +73,7 @@ impl Traffic {
         }
     }
 
-    pub fn simulate(&mut self, policy: impl Policy + 'static) {
+    pub fn simulate(&mut self, policy: Arc<RwLock<(impl Policy + 'static + Sync)>>) {
         let (tx, rx) = mpsc::channel();
         let consumer_queue = Arc::clone(&self.queue);
 
