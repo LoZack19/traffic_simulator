@@ -45,10 +45,10 @@ enum ProbabilityError {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Probability(f32);
+pub struct Probability(f64);
 
 impl Probability {
-    fn new(num: f32) -> Result<Probability, ProbabilityError> {
+    fn new(num: f64) -> Result<Probability, ProbabilityError> {
         if (0.0..=1.0).contains(&num) {
             Ok(Probability(num))
         } else {
@@ -57,8 +57,8 @@ impl Probability {
     }
 }
 
-impl From<f32> for Probability {
-    fn from(value: f32) -> Self {
+impl From<f64> for Probability {
+    fn from(value: f64) -> Self {
         Probability(value)
     }
 }
@@ -70,8 +70,8 @@ impl Distribution<Probability> for Standard {
 }
 
 impl Deref for Probability {
-    type Target = f32;
-    fn deref(&self) -> &f32 {
+    type Target = f64;
+    fn deref(&self) -> &f64 {
         &self.0
     }
 }
@@ -79,17 +79,17 @@ impl Deref for Probability {
 #[derive(Debug)]
 pub struct RandomEarlyDetection {
     queue: Arc<RwLock<Queue>>,
-    range: Range<f32>,
-    average: f32,
-    weight: f32,
+    range: Range<f64>,
+    average: f64,
+    weight: f64,
     max_drop_prob: Probability,
 }
 
 impl RandomEarlyDetection {
     pub fn new(
         queue: Arc<RwLock<Queue>>,
-        range: Range<f32>,
-        weight: f32,
+        range: Range<f64>,
+        weight: f64,
         max_drop_prob: Probability,
     ) -> Result<RandomEarlyDetection, String> {
         if range.start < 0.0 {
@@ -105,25 +105,24 @@ impl RandomEarlyDetection {
             range,
             weight,
             max_drop_prob,
-            average: len as f32,
+            average: len as f64,
         })
     }
 
     fn update_average(&mut self) {
-        let queue_length = self.queue.read().unwrap().len() as f32;
+        let queue_length = self.queue.read().unwrap().len() as f64;
         let new_average = (1.0 - self.weight) * self.average + self.weight * queue_length;
         self.average = new_average;
     }
 
     fn drop_probability(&self) -> Probability {
-        let d_p = if self.average <= self.range.start as f32 {
+        let d_p = if self.average <= self.range.start {
             0.0
-        } else if self.average > self.range.end as f32 {
+        } else if self.average > self.range.end {
             1.0
         } else {
             *self.max_drop_prob
-                * ((self.average - self.range.start as f32)
-                    / (self.range.end - self.range.start) as f32)
+                * ((self.average - self.range.start) / (self.range.end - self.range.start))
         };
 
         Probability::new(d_p).unwrap()

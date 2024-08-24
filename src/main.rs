@@ -7,12 +7,12 @@ use policy::{AllGoIn, Probability, RandomEarlyDetection, Threshold};
 use traffic::Traffic;
 
 fn main() {
-    let mut traffic = Traffic::new();
+    let traffic = Traffic::new(100, 300);
 
-    let all_go_in = AllGoIn;
-    let threshold: Threshold = traffic.define_threshold_policy(10);
+    let _all_go_in = AllGoIn;
+    let _threshold: Threshold = traffic.define_threshold_policy(10);
     let red: RandomEarlyDetection =
-        traffic.define_red_policy(0.0..10.0, 0.02, Probability::from(0.5));
+        traffic.define_red_policy(20.0..30.0, 0.02, Probability::from(0.8));
 
     traffic.simulate(Arc::new(RwLock::new(red)));
 }

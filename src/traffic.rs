@@ -17,12 +17,17 @@ pub type Queue = FixedVecDeque<[i32; 1024]>;
 
 pub struct Traffic {
     queue: Arc<RwLock<Queue>>,
+    max_producer_delay: u64,
+    max_consumer_delay: u64,
+    // policy is instant
 }
 
 impl Traffic {
-    pub fn new() -> Traffic {
+    pub fn new(max_prducer_delay: u64, max_consumer_delay: u64) -> Traffic {
         Traffic {
             queue: Arc::new(RwLock::new(Queue::new())),
+            max_producer_delay: max_prducer_delay,
+            max_consumer_delay,
         }
     }
 
@@ -36,8 +41,8 @@ impl Traffic {
 
     pub fn define_red_policy(
         &self,
-        range: Range<f32>,
-        weight: f32,
+        range: Range<f64>,
+        weight: f64,
         max_drop_prob: Probability,
     ) -> RandomEarlyDetection {
         RandomEarlyDetection::new(self.queue.clone(), range, weight, max_drop_prob).unwrap()
@@ -52,7 +57,7 @@ impl Traffic {
 
             thread::sleep(delay);
 
-            println!("[PRODUCER]: Sending: {}", packet);
+            println!("[PRODUCER]: Sending: {packet}");
             tx.send(packet).unwrap();
         }
     }
@@ -85,14 +90,15 @@ impl Traffic {
         }
     }
 
-    pub fn simulate(&mut self, policy: Arc<RwLock<(impl Policy + 'static + Sync)>>) {
+    pub fn simulate(self, policy: Arc<RwLock<(impl Policy + 'static + Sync)>>) {
         let (tx, rx) = mpsc::channel();
         let admin_queue = Arc::clone(&self.queue);
         let consumer_queue = Arc::clone(&self.queue);
 
-        let producer = thread::spawn(|| Self::random_traffic(tx, 10000));
+        let producer = thread::spawn(move || Self::random_traffic(tx, self.max_producer_delay));
         let admin = thread::spawn(|| Self::traffic_manager(rx, admin_queue, policy));
-        let consumer = thread::spawn(|| Self::traffic_consumer(consumer_queue, 20000));
+        let consumer =
+            thread::spawn(move || Self::traffic_consumer(consumer_queue, self.max_consumer_delay));
 
         producer.join().unwrap();
         admin.join().unwrap();
