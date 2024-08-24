@@ -1,0 +1,8 @@
+[package]
+name = "red_alg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fixed-vec-deque = "0.1.11"
+rand = "0.8.5"
