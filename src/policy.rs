@@ -141,6 +141,11 @@ impl Policy for RandomEarlyDetection {
         let dice = rng.gen::<Probability>();
         let drop_prob = self.update();
 
+        println!(
+            "[POLICY]: {{ len: {:.2}, prob: {:.2}, dice: {:.2} }}",
+            self.average, *drop_prob, *dice
+        );
+
         *drop_prob <= *dice
     }
 }

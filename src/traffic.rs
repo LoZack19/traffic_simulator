@@ -92,7 +92,7 @@ impl Traffic {
 
         let producer = thread::spawn(|| Self::random_traffic(tx, 10000));
         let admin = thread::spawn(|| Self::traffic_manager(rx, admin_queue, policy));
-        let consumer = thread::spawn(|| Self::traffic_consumer(consumer_queue, 50000));
+        let consumer = thread::spawn(|| Self::traffic_consumer(consumer_queue, 20000));
 
         producer.join().unwrap();
         admin.join().unwrap();
