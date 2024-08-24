@@ -36,23 +36,23 @@ impl Traffic {
 
     pub fn define_red_policy(
         &self,
-        range: Range<usize>,
+        range: Range<f32>,
         weight: f32,
         max_drop_prob: Probability,
     ) -> RandomEarlyDetection {
-        RandomEarlyDetection::new(self.queue.clone(), range, weight, max_drop_prob)
+        RandomEarlyDetection::new(self.queue.clone(), range, weight, max_drop_prob).unwrap()
     }
 
-    fn random_traffic(tx: Sender<i32>) {
+    fn random_traffic(tx: Sender<i32>, max_ms: u64) {
         let mut rng = rand::thread_rng();
 
         loop {
-            let delay: Duration = Duration::from_millis(rng.gen_range(0..1000));
+            let delay: Duration = Duration::from_millis(rng.gen_range(0..max_ms));
             let packet: i32 = rng.gen_range(0..100);
 
             thread::sleep(delay);
 
-            println!("Sending: {}", packet);
+            println!("[PRODUCER]: Sending: {}", packet);
             tx.send(packet).unwrap();
         }
     }
@@ -64,23 +64,38 @@ impl Traffic {
     ) {
         for received in rx {
             if policy.write().unwrap().allow() {
-                println!("Allowed: {received}");
+                println!("[POLICY]: Allowed: {received}");
                 *queue.write().unwrap().push_back() = received;
             } else {
-                println!("Discarded: {received}")
+                println!("[POLICY]: Discarded: {received}")
             }
-            println!("{:?}", queue.read().unwrap());
+            println!("[POLICY]: Queue: {:?}", queue.read().unwrap());
+        }
+    }
+
+    fn traffic_consumer(queue: Arc<RwLock<Queue>>, max_ms: u64) {
+        let mut rng = rand::thread_rng();
+
+        loop {
+            let delay: Duration = Duration::from_millis(rng.gen_range(0..max_ms));
+            thread::sleep(delay);
+            if let Some(value) = queue.write().unwrap().pop_front() {
+                println!("[CONSUMER]: Consumed {value}")
+            }
         }
     }
 
     pub fn simulate(&mut self, policy: Arc<RwLock<(impl Policy + 'static + Sync)>>) {
         let (tx, rx) = mpsc::channel();
+        let admin_queue = Arc::clone(&self.queue);
         let consumer_queue = Arc::clone(&self.queue);
 
-        let producer = thread::spawn(|| Self::random_traffic(tx));
-        let consumer = thread::spawn(|| Self::traffic_manager(rx, consumer_queue, policy));
+        let producer = thread::spawn(|| Self::random_traffic(tx, 10000));
+        let admin = thread::spawn(|| Self::traffic_manager(rx, admin_queue, policy));
+        let consumer = thread::spawn(|| Self::traffic_consumer(consumer_queue, 50000));
 
         producer.join().unwrap();
+        admin.join().unwrap();
         consumer.join().unwrap();
     }
 }

@@ -79,7 +79,7 @@ impl Deref for Probability {
 #[derive(Debug)]
 pub struct RandomEarlyDetection {
     queue: Arc<RwLock<Queue>>,
-    range: Range<usize>,
+    range: Range<f32>,
     average: f32,
     weight: f32,
     max_drop_prob: Probability,
@@ -88,18 +88,25 @@ pub struct RandomEarlyDetection {
 impl RandomEarlyDetection {
     pub fn new(
         queue: Arc<RwLock<Queue>>,
-        range: Range<usize>,
+        range: Range<f32>,
         weight: f32,
         max_drop_prob: Probability,
-    ) -> RandomEarlyDetection {
+    ) -> Result<RandomEarlyDetection, String> {
+        if range.start < 0.0 {
+            return Err(format!(
+                "Range start must be a positive integer, but it was given {}",
+                range.start
+            ));
+        }
+
         let len = queue.read().unwrap().len();
-        RandomEarlyDetection {
+        Ok(RandomEarlyDetection {
             queue,
             range,
             weight,
             max_drop_prob,
             average: len as f32,
-        }
+        })
     }
 
     fn update_average(&mut self) {
@@ -115,7 +122,8 @@ impl RandomEarlyDetection {
             1.0
         } else {
             *self.max_drop_prob
-                * ((self.average - self.range.start as f32) / self.range.len() as f32)
+                * ((self.average - self.range.start as f32)
+                    / (self.range.end - self.range.start) as f32)
         };
 
         Probability::new(d_p).unwrap()
@@ -133,7 +141,6 @@ impl Policy for RandomEarlyDetection {
         let dice = rng.gen::<Probability>();
         let drop_prob = self.update();
 
-        println!("{}", self.average);
         *drop_prob <= *dice
     }
 }
