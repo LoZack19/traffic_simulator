@@ -40,7 +40,7 @@ impl Policy for Threshold {
 }
 
 #[derive(Debug)]
-enum ProbabilityError {
+pub enum ProbabilityError {
     OutOfRange,
 }
 
@@ -57,15 +57,16 @@ impl Probability {
     }
 }
 
-impl From<f64> for Probability {
-    fn from(value: f64) -> Self {
-        Probability(value)
+impl TryFrom<f64> for Probability {
+    type Error = ProbabilityError;
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Probability::new(value)
     }
 }
 
 impl Distribution<Probability> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Probability {
-        rng.gen_range(0.0..=1.0).into()
+        rng.gen_range(0.0..=1.0).try_into().unwrap()
     }
 }
 
